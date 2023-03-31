@@ -1,0 +1,1669 @@
+/*sar4021Servlet-營業目標管理表*/
+import java.io.*;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.util.*;
+import jcx.db.*;
+import jcx.util.*;
+import java.text.SimpleDateFormat;
+import java.text.DateFormat;
+import java.util.GregorianCalendar;
+import org.apache.commons.lang.ArrayUtils;
+import org.apache.commons.lang.StringUtils;
+import com.google.gson.Gson;
+
+public class sar4021Servlet extends HttpServlet {
+
+	PrintWriter pw1 = null;
+	StringBuffer error_msg = new StringBuffer();
+	String errMsg = "";
+
+	public void doGet(HttpServletRequest request, HttpServletResponse response)
+	throws IOException {
+
+		talk t6 = null;
+		StringBuffer error_msg = new StringBuffer();
+
+		final String gl_cno = request.getParameter("GL_CNO");
+		final String gl_ad = request.getParameter("GL_AD");
+		final String gl_loguid = request.getParameter("GL_LOGUID");
+		final String gl_rptspool = request.getParameter("GL_RPTSPOOL");
+		final String gl_rptcenter = request.getParameter("GL_RPTCENTER"); //報表存放目錄
+		final String gl_country = request.getParameter("GL_COUNTRY");
+		final String gl_logname = new String(request.getParameter("GL_LOGNAME").getBytes("ISO-8859-1"), "Big5"); //透過servlet 中文需轉換
+		final String rptFile = request.getParameter("rptFile");
+		final String scheduleDateP = request.getParameter("scheduleDate");
+		final String scheduleSeqP = request.getParameter("scheduleSeq");
+		final String gl_porterp = request.getParameter("GL_PORTERP");
+		final String prgidP = request.getParameter("PRGID");
+
+		final String sa65_43P = request.getParameter("sa65_43");//業務處
+		final String sa65_51P = request.getParameter("sa65_51");//區域別
+		final String sa65_30P = request.getParameter("sa65_30");//大類
+		final String sa65_31P = request.getParameter("sa65_31");//產品中類
+		final String sa65_60P = request.getParameter("sa65_60");//機台
+		final String sa64_11P = request.getParameter("sa64_11");//客戶代號
+		final String sa65_44P = request.getParameter("sa65_44");//業務員
+		final String sa64_04P = request.getParameter("sa64_04");//生產部門
+		final String sa65_32P = request.getParameter("sa65_32");//品名
+		final String sa65_33P = request.getParameter("sa65_33");//印花紋
+		final String sa65_38P = request.getParameter("sa65_38");//色號
+		final String sa65_39P = request.getParameter("sa65_39");//印花輪
+		final String sa65_50P = request.getParameter("sa65_50");//專案代號
+		final String sa65_03P = request.getParameter("sa65_03");//訂單單號
+		final String sa65_04P = request.getParameter("sa65_04");//項次
+		final String sa64_24P = request.getParameter("sa64_24");//發票號碼
+		final String sa64_26P = request.getParameter("sa64_26");//傳票號碼
+		final String sa65_46P = request.getParameter("sa65_46");//訂單型態
+		final String sellTypeP = request.getParameter("sellType");//銷售別
+		final String sellIncomeP = request.getParameter("sellIncome");//銷貨收入
+		final String orderCostP = request.getParameter("orderCost");//訂單成本明細
+		final String printTypeP = request.getParameter("printType");//分頁
+		final String dateCP = request.getParameter("dateC");//
+		final String startDateP =  request.getParameter("startDate");
+		final String endDateP =  request.getParameter("endDate");
+
+		String today = datetime.getToday("YYYY/mm/dd"); //取得今天日期
+		String sys_time = datetime.getTime("h:m:s");
+
+		String doSchedule = "N"; //是否由排程執行
+		boolean isSaveToFile = false;
+		if (check.isDate(scheduleDateP, "YYYYmmdd")) { //日期格式
+			doSchedule = "Y";
+			isSaveToFile = true;
+		}
+
+		//建立log檔
+		File logFile = new File(rptFile.trim());//server的檔案
+		if (!logFile.exists()) {
+			logFile.createNewFile();
+		}
+		pw1 = new PrintWriter(new FileWriter(logFile, false));
+		PrintWriter output = response.getWriter();//傳出參數
+		pw1.println(today + " " + sys_time + ", sar4021Servlet Start= "
+		            + gl_cno + "-prgid=" + prgidP + "-日期=" + startDateP +"~"+ endDateP + " -部門=" + sa65_43P);
+
+		error_msg.setLength(0);
+		String [][] rtnData1_1 = new String[0][0];
+		String [][] rtnData1_2 = new String[0][0];
+		String [][] rtnData1_3 = new String[0][0];
+		String [][] rtnData1_4 = new String[0][0];
+		String [][] rtnData1_5 = new String[0][0];
+		String [][] rtnData1_6 = new String[0][0];
+		String [][] rtnData2_1 = new String[0][0];
+		String [][] rtnData2_2 = new String[0][0];
+		String [][] rtnData3_1 = new String[0][0];
+
+		String whereBase = "";
+		String sqlBase1 = "";
+		String sqlBase2 = "";
+		Hashtable htAllReport = new Hashtable();
+		try {
+			/********** 共用參數-外部傳入 **********/
+			Hashtable htParam = new Hashtable(); //共用參數-外部傳入
+			htParam.put("gl_cno", gl_cno);
+			htParam.put("gl_country", gl_country.trim());
+			htParam.put("sa64_04", sa64_04P.trim());//生產部門
+			htParam.put("sa64_11", sa64_11P.trim());//客戶代號
+			htParam.put("sa64_24", sa64_24P.trim());//發票號碼
+			htParam.put("sa64_26", sa64_26P.trim());//傳票號碼
+			htParam.put("sa65_03", sa65_03P.trim());//訂單單號
+			htParam.put("sa65_04", sa65_04P.trim());//項次
+			htParam.put("sa65_30", sa65_30P.trim());//業務處
+			htParam.put("sa65_31", sa65_31P.trim());//產品中類
+			htParam.put("sa65_32", sa65_32P.trim());//品名
+			htParam.put("sa65_33", sa65_33P.trim());//印花紋
+			htParam.put("sa65_38", sa65_38P.trim());//色號
+			htParam.put("sa65_39", sa65_39P.trim());//印花輪
+			htParam.put("sa65_43", sa65_43P.trim());//業務處
+			htParam.put("sa65_44", sa65_44P.trim());//業務員
+			htParam.put("sa65_46", sa65_46P.trim());//訂單型態
+			htParam.put("sa65_51", sa65_51P.trim());//區域別
+			htParam.put("sa65_50", sa65_50P.trim());//專案代號
+			htParam.put("sa65_60", sa65_60P.trim());//業務處
+			htParam.put("sellType", sellTypeP.trim());//銷售別
+			htParam.put("sellIncome", sellIncomeP.trim());//銷貨收入
+			htParam.put("orderCost", orderCostP.trim());//訂單成本明細
+			htParam.put("printType", printTypeP.trim());//分頁
+			htParam.put("dateC", dateCP.trim());//
+			htParam.put("startDate", startDateP.trim());//
+			htParam.put("endDate", endDateP.trim());//
+			/********** 共用參數-外部傳入END **********/
+			t6 = bdata.getTalk("erp.pkg", gl_country+"_INFORMIX");
+
+			if (isSaveToFile == false) {
+				whereBase = getWhere(t6,htParam);
+				sqlBase1 = getSqlBase1(t6,htParam,whereBase);
+				sqlBase2 = getSqlBase2("getSearch");
+
+				if(printTypeP.equals("1")){
+					rtnData1_1 = doOutDataA(t6,htParam,sqlBase1,sqlBase2,whereBase);//最終輸出報表
+					rtnData1_2 = doOutDataB(t6,htParam,sqlBase1,sqlBase2);//最終輸出報表
+					rtnData1_3 = doOutDataC(t6,htParam,sqlBase1,sqlBase2);//最終輸出報表
+					rtnData1_4 = doOutDataD(t6,htParam,sqlBase1,sqlBase2);//最終輸出報表
+					rtnData1_5 = doOutDataE(t6,htParam,sqlBase1,sqlBase2);//最終輸出報表
+					rtnData1_6 = doOutDataF(t6,htParam,sqlBase1,sqlBase2);//最終輸出報表
+				} else if(printTypeP.equals("2")){
+					rtnData2_1 = doOutDataG(t6,htParam,sqlBase1,sqlBase2);//最終輸出報表
+					rtnData2_2 = doOutDataH(t6,htParam,sqlBase1,sqlBase2);//最終輸出報表
+				} else {
+					rtnData3_1 = doOutDataI(t6,htParam,sqlBase1,sqlBase2);//最終輸出報表
+				}
+			} else if (isSaveToFile == true) {
+				whereBase = getWhere(t6,htParam);
+				sqlBase1 = getSqlBase1(t6,htParam,whereBase);
+				sqlBase2 = getSqlBase2("getSearch");
+				String [][] tmpData1_1 = doOutDataA(t6,htParam,sqlBase1,sqlBase2,whereBase);
+				String [][] tmpData1_2 = doOutDataB(t6,htParam,sqlBase1,sqlBase2);
+				String [][] tmpData1_3 = doOutDataC(t6,htParam,sqlBase1,sqlBase2);
+				String [][] tmpData1_4 = doOutDataD(t6,htParam,sqlBase1,sqlBase2);
+				String [][] tmpData1_5 = doOutDataE(t6,htParam,sqlBase1,sqlBase2);
+				String [][] tmpData1_6 = doOutDataF(t6,htParam,sqlBase1,sqlBase2);
+				String [][] tmpData2_1 = doOutDataG(t6,htParam,sqlBase1,sqlBase2);
+				String [][] tmpData2_2 = doOutDataH(t6,htParam,sqlBase1,sqlBase2);
+				String [][] tmpData3_1 = doOutDataI(t6,htParam,sqlBase1,sqlBase2);
+
+				String [] header = null;
+				Vector excelTmp = new Vector();
+				String [][] outputExcel = null;
+				String [] outputExceltmp = new String[30];
+
+				int pageType = 6;
+
+				Hashtable htPageType = new Hashtable();
+				if(printTypeP.equals("1")){
+					htPageType.put("header1",getHeader1_1());
+					htPageType.put("header2",getHeader1_2());
+					htPageType.put("header3",getHeader1_3());
+					htPageType.put("header4",getHeader1_4());
+					htPageType.put("header5",getHeader1_5());
+					htPageType.put("header6",getHeader1_6());
+					htPageType.put("tmpData1_1",tmpData1_1);
+					htPageType.put("tmpData1_2",tmpData1_2);
+					htPageType.put("tmpData1_3",tmpData1_3);
+					htPageType.put("tmpData1_4",tmpData1_4);
+					htPageType.put("tmpData1_5",tmpData1_5);
+					htPageType.put("tmpData1_6",tmpData1_6);
+				} else if(printTypeP.equals("2")){
+					pageType = 2;
+					htPageType.put("header1",getHeader2_1());
+					htPageType.put("header2",getHeader2_2());
+					htPageType.put("tmpData2_1",tmpData2_1);
+					htPageType.put("tmpData2_2",tmpData2_2);
+				} else if(printTypeP.equals("3")){
+					pageType = 1;
+					htPageType.put("header1",getHeader3_1());
+					htPageType.put("tmpData3_1",tmpData3_1);
+				}
+
+				String[][] setTmpData = null;
+				for(int i = 0;i<pageType;i++){
+					String[] setHeader = (String[])htPageType.get("header"+String.valueOf(i+1));
+					if(printTypeP.equals("1")){
+						setTmpData = (String[][])htPageType.get("tmpData1_"+String.valueOf(i+1));
+					} else if(printTypeP.equals("2")){
+						setTmpData = (String[][])htPageType.get("tmpData2_"+String.valueOf(i+1));
+					} else if(printTypeP.equals("3")){
+						setTmpData = (String[][])htPageType.get("tmpData3_"+String.valueOf(i+1));
+					}
+
+					outputExceltmp = new String[setHeader.length];
+					Arrays.fill(outputExceltmp,"");
+					for (int j = 0; j < setHeader.length; j++) {
+						outputExceltmp[j] = setHeader[j];
+					}
+					excelTmp.add(outputExceltmp);
+
+					for (int j = 0; j < setTmpData.length; j++) {
+						outputExceltmp = new String[setTmpData[0].length];
+						Arrays.fill(outputExceltmp,"");
+						for (int k = 0; k < setTmpData[0].length; k++) {
+							outputExceltmp[k] = setTmpData[j][k];
+						}
+						excelTmp.add(outputExceltmp);
+					}
+				}
+
+				outputExcel = (String[][])excelTmp.toArray(new String[0][0]);
+				// 例 fileName = D:\\Spool\\opc\\andylin.odsTest.ods
+				// 於正式環境以Servlet執行: 會存在 \\192.168.0.5\\d$\\Spool\\opc\\andylin.odsTest.ods
+				// 於正式環境以server side執行: 會存在 \\192.168.0.5\\Spool\\opc\\andylin.odsTest.ods
+				// 於正式環境以client side執行: 會存在 使用者電腦 D:\\Spool\\opc\\andylin.odsTest.ods
+				// final String FILENAME = "D:\\Spool\\opc\\andylin.odsTest" + today.replace("/", "") + ".ods";
+				final String FILENAME = gl_rptcenter + gl_ad + ".sar4021.xls";
+				pw1.println("File output location:" + FILENAME);
+				jopc.util.getOpc.exportToExcel_POI(outputExcel, FILENAME);
+			}
+		} catch (jopc.ext.ownException e) {//大洋自訂
+			error_msg.append(e.getMessage());
+			pw1.println(e.getMessage());
+		} catch (Exception e) {
+			errMsg = "★執行異常，請洽資訊部 =" + e.getMessage();
+			error_msg.append(errMsg.trim());
+			pw1.println("sar4021Servlet Exception = " + errMsg.trim());
+			StackTraceElement[] ste = e.getStackTrace();
+			for (int i = 0; i < ste.length; i++) {
+				pw1.println(ste[i].toString());
+			}
+		} finally {
+			pw1.println("End=" + (String)datetime.getToday("YYYY/mm/dd") + " " + (String)datetime.getTime("h:m:s"));
+			Hashtable htRData = new Hashtable();
+			htRData.put("rtnData1_1", rtnData1_1 == null ? (new String[0][0]) : rtnData1_1);
+			htRData.put("rtnData1_2", rtnData1_2 == null ? (new String[0][0]) : rtnData1_2);
+			htRData.put("rtnData1_3", rtnData1_3 == null ? (new String[0][0]) : rtnData1_3);
+			htRData.put("rtnData1_4", rtnData1_4 == null ? (new String[0][0]) : rtnData1_4);
+			htRData.put("rtnData1_5", rtnData1_5 == null ? (new String[0][0]) : rtnData1_5);
+			htRData.put("rtnData1_6", rtnData1_6 == null ? (new String[0][0]) : rtnData1_6);
+			htRData.put("rtnData2_1", rtnData2_1 == null ? (new String[0][0]) : rtnData2_1);
+			htRData.put("rtnData2_2", rtnData2_2 == null ? (new String[0][0]) : rtnData2_2);
+			htRData.put("rtnData3_1", rtnData3_1 == null ? (new String[0][0]) : rtnData3_1);
+
+			Hashtable htReturn = new Hashtable();
+			htReturn.put("error", error_msg.toString());
+			htReturn.put("rData", htRData);
+
+			// if (error_msg.length() > 0) {
+			// 	pw1.println("error_msg=" + error_msg.toString());
+			// 	output.println(error_msg.toString());
+			// }
+			Gson gson = new Gson();
+			output.println(gson.toJson(htReturn));
+			// pw1.println("will pass htReturn=" + gson.toJson(htReturn));
+
+			/********* 更新執行日期和結果 *********/
+			if (jcx.util.check.isDate(scheduleDateP, "YYYYmmdd") && doSchedule.equals("Y")) {
+				Hashtable ht = new Hashtable();
+
+				String updateType = "E"; //更新區分(S-執行起始日期/E-執行截止日期和結果)
+				String relateNo = "00"; //關聯代號
+
+				ht.put("updateType", updateType);//更新區分(S-執行起始日期/E-執行截止日期和結果)
+				ht.put("uid", gl_loguid);//使用者帳號
+				ht.put("prgid", prgidP);//程式代號
+				ht.put("scheduleDate", scheduleDateP);//執行日期
+				ht.put("scheduleSeq", scheduleSeqP);//順序
+				ht.put("relateNo", relateNo);//關聯代號
+				ht.put("error_msg", error_msg);//錯誤訊息
+
+				jopc.util.LibSYS.updateSchedule(t6, gl_cno, ht);//更新排程執行時間和結果
+			}
+			/********* 更新執行日期和結果 *********/
+			output.close();
+			pw1.close();
+		}
+	}
+	//------------------------------------------------------------------------------
+	//Wherebase
+	private String getWhere(talk t, Hashtable htParam)throws Exception {
+		String sa64_04 = (String)htParam.get("sa64_04");//生產部門
+		String sa64_11 = (String)htParam.get("sa64_11");//客戶代號
+		String sa64_24 = (String)htParam.get("sa64_24");//發票號碼
+		String sa64_26 = (String)htParam.get("sa64_26");//傳票號碼
+		String sa65_03 = (String)htParam.get("sa65_03");//訂單單號
+		String sa65_04 = (String)htParam.get("sa65_04");//項次
+		String sa65_30 = (String)htParam.get("sa65_30");
+		String sa65_31 = (String)htParam.get("sa65_31");//產品中類
+		String sa65_32 = (String)htParam.get("sa65_32");//品名
+		String sa65_33 = (String)htParam.get("sa65_33");//印花紋
+		String sa65_38 = (String)htParam.get("sa65_38");//色號
+		String sa65_39 = (String)htParam.get("sa65_39");//印花輪
+		String sa65_43 = (String)htParam.get("sa65_43");//業務處
+		String sa65_44 = (String)htParam.get("sa65_44");//業務員
+		String sa65_51 = (String)htParam.get("sa65_51");//區域別
+		String sa65_46 = (String)htParam.get("sa65_46");//訂單型態
+		String sa65_50 = (String)htParam.get("sa65_50");//專案代號
+		String sa65_60 = (String)htParam.get("sa65_60");
+		String sellType = (String)htParam.get("sellType");//銷售別
+		String dateC = (String)htParam.get("dateC");//分頁
+		String startDate = (String)htParam.get("startDate");//日期
+		String endDate = (String)htParam.get("endDate");//日期
+		//---------------------------------------------------------------------------------------------------------------------------------------
+		//where 條件
+		String sqlSearch = "";
+		if(dateC.equals("0")){
+			sqlSearch = sqlSearch+" and sa64_25 between '"+startDate+"' and '"+endDate+"' and sa64_24 is not null and sa64_24 != ' '";
+		} else {
+			sqlSearch = sqlSearch+" and sa64_03 between '"+startDate+"' and '"+endDate+"'";
+		}
+
+		if(sa64_04.length() > 0){
+			sqlSearch = sqlSearch+" and sa64_04 = '"+sa64_04+"'";
+		}
+
+		if(sa64_11.length() > 0){
+			sqlSearch = sqlSearch+" and sa64_11 = '"+sa64_11+"'";
+		}
+
+		if(sa64_24.length() > 0){
+			sqlSearch = sqlSearch+" and sa64_24 = '"+sa64_24+"'";
+		}
+
+		if(sa64_26.length() > 0){
+			sqlSearch = sqlSearch+" and sa64_26 = '"+sa64_26+"'";
+		}
+
+		if(sa65_44.length() > 0){
+			sqlSearch = sqlSearch+" and sa65_44 = '"+sa65_44+"'";
+		}
+
+		if(sa65_03.length() > 0){
+			sqlSearch = sqlSearch+" and sa65_03 = '"+sa65_03+"'";
+		}
+
+		if(sa65_04.length() > 0){
+			sqlSearch = sqlSearch+" and sa65_04 = '"+sa65_04+"'";
+		}
+
+		if(sa65_30.length() > 0){
+			sqlSearch = sqlSearch+" and sa65_30 = '"+sa65_30+"'";
+		}
+
+		if(sa65_31.length() > 0){
+			sqlSearch = sqlSearch+" and sa65_31 = '"+sa65_31+"'";
+		}
+
+		if(sa65_32.length() > 0){
+			sqlSearch = sqlSearch+" and sa65_32 = '"+sa65_32+"'";
+		}
+
+		if(sa65_33.length() > 0){
+			sqlSearch = sqlSearch+" and sa65_33 = '"+sa65_33+"'";
+		}
+
+		if(sa65_38.length() > 0){
+			sqlSearch = sqlSearch+" and sa65_38 = '"+sa65_38+"'";
+		}
+
+		if(sa65_39.length() > 0){
+			sqlSearch = sqlSearch+" and sa65_39 = '"+sa65_39+"'";
+		}
+
+		if(sa65_43.length() > 0){
+			sqlSearch = sqlSearch+" and sa65_43 = '"+sa65_43+"'";
+		}
+
+		if(sa65_46.length() > 0){
+			sqlSearch = sqlSearch+" and sa65_46 = '"+sa65_46+"'";
+		}
+
+		if(sa65_50.length() > 0){
+			sqlSearch = sqlSearch+" and sa65_50 = '"+sa65_50+"'";
+		}
+
+		if(sa65_51.length() > 0){
+			sqlSearch = sqlSearch+" and sa65_51[2] = '"+sa65_51+"'";
+		}
+
+		if(sa65_60.length() > 0){
+			sqlSearch = sqlSearch+" and sa65_60 = '"+sa65_60+"'";
+		}
+
+		if(sellType.length() > 0){
+			sqlSearch = sqlSearch+" and sa64_31 matches '["+sellType+"]'";
+		}
+		return sqlSearch;
+	}
+	//------------------------------------------------------------------------------
+	//sqlbase
+	private String getSqlBase1(talk t, Hashtable htParam,String whereBase)throws Exception {
+		String gl_cno = (String)htParam.get("gl_cno");
+		String orderCost = (String)htParam.get("orderCost");//訂單成本明細
+		String dateC = (String)htParam.get("dateC");//分頁
+		String startDate = (String)htParam.get("startDate");//日期
+		String endDate = (String)htParam.get("endDate");//日期
+		String sa65_46 = (String)htParam.get("sa65_46");//訂單型態
+		String sellIncome = (String)htParam.get("sellIncome");//銷貨收入
+
+		StringBuffer sqlBase = new StringBuffer();
+		sqlBase.append(" select sa64_31,sa64_04,sa65_32,sa08_04,sa65_25,sa65_03,sa65_04,sa65_44,sa65_12");
+		sqlBase.append(",sa65_53,sa65_54,sa65_26,sa65_58,sa65_57,sa65_64,sa65_56,sa65_15");
+		sqlBase.append(",sa64_11,sa65_05,sa65_52,sa07_04,sa07_07,sa65_60,sa65_31,sa07_06,sa65_27,sa65_51,sa39_09");
+		if(orderCost.equals("Y") && operation.compareTo(endDate.substring(0,6),"202211") >= 0){
+			sqlBase.append(",sa65_52");
+			sqlBase.append(",0 as ca70_04,0 as ca70_06,0 as ca70_08,0 as ca70_10,0 as ca70_07,0 as ca70_09,0 as ca70_11");
+			sqlBase.append(",case when sa64_35 = '1' then sa65_52 when len(sa65_03) = 0 then sa65_52 else sa65_52-sa65_20-sa65_59-sa65_62 end as ca70_22");
+			sqlBase.append(",0 as ca70_23,0 as ca70_24,0 as ca70_25");
+			sqlBase.append(",case when sa64_35 = '1' or len(sa65_03) = 0 then 0 else sa65_20 end as ca70_28");
+			sqlBase.append(",case when sa64_35 = '1' or len(sa65_03) = 0 then 0 else sa65_59 end as ca70_29");
+			sqlBase.append(",case when sa64_35 = '1' or len(sa65_03) = 0 then 0 else sa65_62 end as ca70_30");
+			sqlBase.append(",0 as ca70_31,0 as ca70_32");
+		} else {
+			sqlBase.append(",sa65_52");
+			sqlBase.append(",0 as ca70_04,0 as ca70_06,0 as ca70_08,0 as ca70_10,0 as ca70_07");
+			sqlBase.append(",0 as ca70_09,0 as ca70_11,sa65_52 as ca70_22,0 as ca70_23,0 as ca70_24");
+			sqlBase.append(",0 as ca70_25,0 as ca70_28,0 as ca70_29,0 as ca70_30,0 as ca70_31,0 as ca70_32");
+		}
+		sqlBase.append(" from safm064,safm065,safm007,safm008,outer safm039");
+		sqlBase.append(" where sa64_cno= '"+gl_cno+"'");
+		sqlBase.append(" and sa64_cno= sa65_cno");
+		sqlBase.append(" and sa64_01 = sa65_01");
+		sqlBase.append(" and sa64_02 = sa65_02");
+		if(sa65_46.length() == 0 && sellIncome.equals("Y")){
+			sqlBase.append(" and sa65_31 != '91' and sa65_02[1] not matches '[CZ]'");
+		}
+		if(sa65_46.length() == 0 && sellIncome.equals("A")){
+			sqlBase.append(" and sa65_31  = '91' and sa65_02[1] not matches '[CZ]'");
+		}
+		sqlBase.append(" "+whereBase);
+		sqlBase.append(" and sa64_cno = sa08_cno");
+		sqlBase.append(" and sa65_30 = sa08_01");
+		sqlBase.append(" and sa65_32 = sa08_03");
+		sqlBase.append(" and sa64_cno = sa39_cno");
+		sqlBase.append(" and sa65_cno = sa07_cno");
+		sqlBase.append(" and sa65_03 = sa39_01");
+		sqlBase.append(" and sa65_30 = sa07_01");
+		sqlBase.append(" and sa65_31 = sa07_02");
+		return sqlBase.toString();//*/
+	}
+	//------------------------------------------------------------------------------
+	//sqlbase
+	private String getSqlBase2(String sqlSearch)throws Exception {
+		StringBuffer sqlBase2 = new StringBuffer();
+		sqlBase2.append(" select sa65_25,sa65_53,sa65_54,sa65_26,sa65_58,sa65_57,sa65_64");
+		sqlBase2.append(",case when ca70_04 is null or ca70_04 = '' then 0 else ca70_04 end as ca70_04");
+		sqlBase2.append(",case when ca70_06 is null or ca70_06 = '' then 0 else ca70_06 end as ca70_06");
+		sqlBase2.append(",case when ca70_08 is null or ca70_08 = '' then 0 else ca70_08 end as ca70_08");
+		sqlBase2.append(",case when ca70_10 is null or ca70_10 = '' then 0 else ca70_10 end as ca70_10");
+		sqlBase2.append(",case when ca70_07 is null or ca70_07 = '' then 0 else ca70_07 end as ca70_07");
+		sqlBase2.append(",case when ca70_09 is null or ca70_09 = '' then 0 else ca70_09 end as ca70_09");
+		sqlBase2.append(",case when ca70_11 is null or ca70_11 = '' then 0 else ca70_11 end as ca70_11");
+		sqlBase2.append(",case when ca70_22 is null or ca70_22 = '' then sa65_52 else ca70_22 end as ca70_22");
+		sqlBase2.append(",case when ca70_23 is null or ca70_23 = '' then 0 else ca70_23 end as ca70_23");
+		sqlBase2.append(",case when ca70_24 is null or ca70_24 = '' then 0 else ca70_24 end as ca70_24");
+		sqlBase2.append(",case when ca70_25 is null or ca70_25 = '' then 0 else ca70_25 end as ca70_25");
+		sqlBase2.append(",case when ca70_28 is null or ca70_28 = '' then 0 else ca70_28 end as ca70_28");
+		sqlBase2.append(",case when ca70_29 is null or ca70_29 = '' then 0 else ca70_29 end as ca70_29");
+		sqlBase2.append(",case when ca70_30 is null or ca70_30 = '' then 0 else ca70_30 end as ca70_30");
+		sqlBase2.append(",case when ca70_31 is null or ca70_31 = '' then 0 else ca70_31 end as ca70_31");
+		sqlBase2.append(",case when ca70_32 is null or ca70_32 = '' then 0 else ca70_32 end as ca70_32");
+		return sqlBase2.toString();//*/
+	}
+	//===============================================================
+	//select Data
+	//===============================================================
+	private String[][] doOutDataA(talk t, Hashtable htParam,String sqlBase1,String sqlBase2,String whereBase)throws Exception {
+		String gl_cno = (String)htParam.get("gl_cno");
+		String gl_country = (String)htParam.get("gl_country");
+		String sa65_46 = (String)htParam.get("sa65_46");//訂單型態
+		String sa65_03 = (String)htParam.get("sa65_03");//訂單單號
+		String sa65_51 = (String)htParam.get("sa65_51");//區域別
+		String sellType = (String)htParam.get("sellType");//銷售別
+		String dateC = (String)htParam.get("dateC");//分頁
+		String orderCost = (String)htParam.get("orderCost");//訂單成本明細
+		String startDate = (String)htParam.get("startDate");//日期
+		String endDate = (String)htParam.get("endDate");//日期
+		String sellIncome = (String)htParam.get("sellIncome");//銷貨收入
+		String scaleS = "0";
+		if(gl_country.equals("CN")){
+			scaleS = "2";
+		}
+
+		String sqlSearch = "";
+		StringBuffer sql = new StringBuffer();
+		Vector vData = new Vector();
+		String[][] rec = null;
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+		//交易條件
+		sql.setLength(0);
+		sql.append(" select distinct op21_04,op21_05");
+		sql.append(" from opfm021");
+		sql.append(" where op21_01 = 'AJ'");
+		String[][] recOP21 = t.queryFromPool(sql.toString());
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+		//20230221新增收率 跟效率計算  &  ca70資料
+		sqlSearch = "";
+		sqlSearch = sqlSearch+" from safm064,safm065,cafm070,safm039";//,opfm021
+		sqlSearch = sqlSearch+" where sa64_cno = sa65_cno";
+		sqlSearch = sqlSearch+" and sa64_cno= ca70_cno";
+		sqlSearch = sqlSearch+" and sa64_cno = sa39_cno";
+		sqlSearch = sqlSearch+" and sa64_01 = sa65_01";
+		sqlSearch = sqlSearch+" and sa64_02 = sa65_02";
+		if(sa65_46.length() == 0 && sellIncome.equals("Y")){
+			sqlSearch = sqlSearch+" and sa65_31 != '91' and sa65_02[1] not matches '[CZ]'";
+		}
+		if(sa65_46.length() == 0 && sellIncome.equals("A")){
+			sqlSearch = sqlSearch+" and sa65_31  = '91' and sa65_02[1] not matches '[CZ]'";
+		}
+		sqlSearch = sqlSearch+" "+whereBase;
+		sqlSearch = sqlSearch+" and sa65_03 = sa39_01";
+		sqlSearch = sqlSearch+" and ca70_01 <= '"+endDate.trim().substring(0,6)+"'";
+		sqlSearch = sqlSearch+" and ca70_02  = sa64_04";
+		sqlSearch = sqlSearch+" and ca70_03[8,48] = sa65_03||sa65_04||sa65_05";
+
+		String sqlSearch2 = "";
+		if(orderCost.equals("Y")){
+			if(operation.compareTo(endDate.substring(0,6),"202211") >= 0){
+				sqlSearch2 = sqlSearch2+",case when sum(ca70_04) = 0 then 0 else round(sum(ca70_06 + ca70_08 + ca70_10)*100/sum(ca70_04),2) end as ca70_04";
+				sqlSearch2 = sqlSearch2+",case when sum(ca70_32) = 0 then 0 else round(sum(ca70_06 + ca70_08 + ca70_10)/sum(ca70_32),2) end as ca70_32";
+			} else {
+				sqlSearch2 = sqlSearch2+",case when sum(sa65_53) = 0 then 0 else round(sum(ca70_22+ca70_30+sa65_26+sa65_27+ca70_28+ca70_29+sa65_58+sa65_57+sa65_64) /sum(sa65_53),2) end as sa65_53";
+				sqlSearch2 = sqlSearch2+",case when sum(sa65_53) = 0 then 0 else round(sum(sa65_25)/(sum(sa65_53)-(sum(ca70_22+ca70_30+sa65_26+sa65_27+ca70_28+ca70_29+sa65_58+sa65_57+sa65_64) /sum(sa65_53))),2) end as sa65_53";
+				sqlSearch2 = sqlSearch2+",round(sum(ca70_22),"+scaleS+")";
+				sqlSearch2 = sqlSearch2+",round(sum(ca70_30),"+scaleS+")";
+				sqlSearch2 = sqlSearch2+",round(sum(sa65_25),"+scaleS+")-round(sum(ca70_22),"+scaleS+")-round(sum(ca70_30),"+scaleS+")-round(sum(sa65_26+sa65_27),"+scaleS+")";
+				sqlSearch2 = sqlSearch2+",case when sum(sa65_25) = 0 then 0 else round((sum(sa65_25)-sum(ca70_22)-sum(ca70_30)-sum(sa65_26+sa65_27))/sum(sa65_25)*100,2) end as sa65_25";
+				sqlSearch2 = sqlSearch2+",round(sum(ca70_28),"+scaleS+")";
+				sqlSearch2 = sqlSearch2+",round(sum(ca70_29),"+scaleS+")";
+				sqlSearch2 = sqlSearch2+",round(sum(sa65_25-ca70_22-ca70_28-ca70_29-ca70_30-sa65_57-sa65_58-sa65_64-sa65_26-sa65_27),2)";
+				sqlSearch2 = sqlSearch2+",case when sum(sa65_25) = 0 then 0 else round(sum(sa65_25-ca70_22-ca70_28-ca70_29-ca70_30-sa65_57-sa65_58-sa65_64-sa65_26-sa65_27)/sum(sa65_25)*100,2) end as sa65_25";
+				sqlSearch2 = sqlSearch2+",case when sum(ca70_04) = 0 then 0 else round((sum(ca70_06) / sum(ca70_04) * 100),"+scaleS+") end as ca70_06";
+				sqlSearch2 = sqlSearch2+",case when sum(ca70_32) = 0 then 0 else round((sum(ca70_06) / sum(ca70_32)),"+scaleS+") end as ca70_32";
+				sqlSearch2 = sqlSearch2+",round(sum(ca70_22+ca70_30+sa65_26+sa65_27+ca70_28+ca70_29+sa65_58+sa65_57+sa65_64),"+scaleS+")";
+			}
+		}
+
+		String[][] recSA6465CA70 = null;
+		sql.setLength(0);
+		sql.append(" select sa64_04,sa65_32,sa39_09");
+		sql.append(sqlSearch2);
+		sql.append(sqlSearch);
+		sql.append(" group by sa64_04,sa65_32,sa39_09");
+		sql.append(" union all");
+		sql.append(" select '合計','',''");
+		sql.append(sqlSearch2);
+		sql.append(sqlSearch);
+		if(orderCost.equals("Y")){
+			recSA6465CA70 = t.queryFromPool(sql.toString());
+
+			//更改交易條件
+			for(int i = 0;i<recSA6465CA70.length;i++){
+				String sa39_09 = recSA6465CA70[i][2].trim();
+				if(sa39_09.length() == 0){
+					recSA6465CA70[i][2] = "內銷";
+				} else {
+					for(int j = 0;j<recOP21.length;j++){
+						String op21_04 = recOP21[j][0].trim();
+						String op21_05 = recOP21[j][1].trim();
+						if(sa39_09.equals(op21_04)){
+							recSA6465CA70[i][2] = op21_05;
+						}
+					}
+				}
+			}
+		}
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+		//運費
+		sqlSearch = "";
+		sqlSearch = sqlSearch+" and sa64_cno= sa65_cno";
+		sqlSearch = sqlSearch+" and sa64_01 = sa65_01";
+		sqlSearch = sqlSearch+" and sa64_02 = sa65_02";
+		sqlSearch = sqlSearch+" and sa64_cno = sa97_cno";
+		sqlSearch = sqlSearch+" and sa64_cno = sa98_cno";
+		sqlSearch = sqlSearch+" and sa97_01  = sa98_01";
+		sqlSearch = sqlSearch+" and sa97_02  = sa98_02";
+		sqlSearch = sqlSearch+" and sa97_03  = sa98_03";
+		sqlSearch = sqlSearch+" and sa98_03 matches '[AC]'";
+		sqlSearch = sqlSearch+" and sa98_05  = sa65_03";
+		sqlSearch = sqlSearch+" and sa98_06  = sa65_04";
+		sqlSearch = sqlSearch+" and sa97_05 between '"+datetime.dateAdd(startDate,"m",-1)+"' and '"+endDate.trim()+"'";
+		if(sa65_46.length() == 0 && sellIncome.equals("Y")){
+			sqlSearch = sqlSearch+" and sa65_31 != '91' and sa65_02[1] not matches '[CZ]'";
+		}
+		if(sa65_46.length() == 0 && sellIncome.equals("A")){
+			sqlSearch = sqlSearch+" and sa65_31  = '91' and sa65_02[1] not matches '[CZ]'";
+		}
+		sqlSearch = sqlSearch+" "+whereBase;
+
+		sql.setLength(0);
+		sql.append(" select sa64_04,sa65_32");
+		sql.append(",case when (op21_05 is null or len(op21_05) = 0) and trim(sa64_04) != '合計' then '內銷' else op21_05 end as op21_05");
+		sql.append(",round(sum(sa98_12),"+scaleS+") from (");
+		sql.append(" select sa64_04,sa65_32,op21_05,sa98_12 from (");
+		sql.append(" select sa64_04,sa65_32,sa39_09,sa98_12");
+		sql.append(" from safm064,safm065,safm097,safm098,outer safm039");
+		sql.append(" where sa64_cno= '"+gl_cno+"'");
+		sql.append(" and sa39_01 = sa65_03");
+		sql.append(sqlSearch);
+		sql.append(" union all");
+		sql.append(" select '合計','','',sa98_12");
+		sql.append(" from safm064,safm065,safm097,safm098");
+		sql.append(" where sa64_cno= '"+gl_cno+"'");
+		sql.append(sqlSearch);
+		sql.append("),outer opfm021 where op21_01 = 'AJ' and sa39_09 = op21_04");
+		sql.append(")");
+		sql.append(" group by 1,2,3 order by 1");
+		String[][] recSA97 = t.queryFromPool(sql.toString());
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+		//主資料
+		sqlSearch = "";
+		sqlSearch = sqlSearch+",case when sum(sa65_53) = 0 then 0 else round(sum(ca70_22+ca70_30+sa65_26+sa65_27+ca70_28+ca70_29+sa65_58+sa65_57+sa65_64) /sum(sa65_53),2) end as sa65_53";
+		sqlSearch = sqlSearch+",case when sum(sa65_53) = 0 then 0 else round(sum(sa65_25)/(sum(sa65_53)-(sum(ca70_22+ca70_30+sa65_26+sa65_27+ca70_28+ca70_29+sa65_58+sa65_57+sa65_64) /sum(sa65_53))),2) end as sa65_53";
+		sqlSearch = sqlSearch+",round(sum(sa65_53),2),round(sum(sa65_54),2),round(sum(sa65_25),"+scaleS+")";//
+		sqlSearch = sqlSearch+",round(sum(ca70_22),"+scaleS+"),round(sum(ca70_30),"+scaleS+"),round(sum(sa65_26+sa65_27),"+scaleS+")";
+		sqlSearch = sqlSearch+",round(sum(sa65_25),"+scaleS+")-round(sum(ca70_22),"+scaleS+")-round(sum(ca70_30),"+scaleS+")-round(sum(sa65_26+sa65_27),"+scaleS+")";
+		sqlSearch = sqlSearch+",case when sum(sa65_25) = 0 then 0 else round((sum(sa65_25)-sum(ca70_22)-sum(ca70_30)-sum(sa65_26+sa65_27))/sum(sa65_25)*100,2) end as sa65_25";
+		sqlSearch = sqlSearch+",round(sum(ca70_28),"+scaleS+"),round(sum(ca70_29),"+scaleS+"),round(sum(sa65_58),"+scaleS+"),round(sum(sa65_57),"+scaleS+"),round(sum(sa65_64),"+scaleS+")";//
+		sqlSearch = sqlSearch+",round(sum(sa65_25-ca70_22-ca70_28-ca70_29-ca70_30-sa65_57-sa65_58-sa65_64-sa65_26-sa65_27),2)";
+		sqlSearch = sqlSearch+",case when sum(sa65_25) = 0 then 0 else round(sum(sa65_25-ca70_22-ca70_28-ca70_29-ca70_30-sa65_57-sa65_58-sa65_64-sa65_26-sa65_27)/sum(sa65_25)*100,2) end as sa65_25";
+		sqlSearch = sqlSearch+",0";
+		sqlSearch = sqlSearch+",case when sum(ca70_04) = 0 then 0 else round((sum(ca70_06) / sum(ca70_04) * 100),"+scaleS+") end as ca70_06";
+		sqlSearch = sqlSearch+",case when sum(ca70_32) = 0 then 0 else round((sum(ca70_06) / sum(ca70_32)),"+scaleS+") end as ca70_32";
+		sqlSearch = sqlSearch+",round(sum(ca70_22+ca70_30+sa65_26+sa65_27+ca70_28+ca70_29+sa65_58+sa65_57+sa65_64),"+scaleS+")";
+
+
+		sql.setLength(0);
+		sql.append(" select sa64_04,sa65_32,sa08_04");
+		sql.append(",case when (op21_05 is null or len(op21_05) = 0) and trim(sa64_04) != '合計' then '內銷' else op21_05 end as op21_05");
+		sql.append(",case when sum(sa65_53) = 0 then 0 else  round(sum(sa65_25) / sum(sa65_53),2) end as sa65_53");//
+		sql.append(",0"+sqlSearch+" from (");
+		sql.append(sqlBase2+",sa64_04,sa65_32,sa08_04,sa65_27,op21_05 from (");
+		sql.append(sqlBase1+") ,outer opfm021 where op21_01 = 'AJ' and sa39_09 = op21_04)");
+		sql.append(" group by 1,2,3,4");
+		sql.append(" union all ");
+		sql.append(" select '合計','','','',0,0"+sqlSearch+" from (");
+		sql.append(sqlBase2+",sa64_04,sa65_32,sa08_04,sa65_27,sa39_09 from (");
+		sql.append(sqlBase1);
+		sql.append("))");
+		sql.append(" order by sa64_04,sa65_32,sa08_04");
+		rec = t.queryFromPool(sql.toString());
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+		//ca70
+		if(recSA6465CA70 != null){
+			for(int i = 0;i<rec.length;i++){
+				String sa64_04T = rec[i][0].trim();
+				String sa65_32T = rec[i][1].trim();
+				String op21_05 = rec[i][3].trim();
+				for(int j = 0;j<recSA6465CA70.length;j++){
+					String sa64_04tmp = recSA6465CA70[j][0].trim();
+					String sa65_32tmp = recSA6465CA70[j][1].trim();
+					String op21_05tmp = recSA6465CA70[j][2].trim();
+					if((sa64_04T.equals("合計") && sa64_04tmp.equals("合計")) || (sa64_04T.equals(sa64_04tmp) && sa65_32T.equals(sa65_32tmp) && op21_05.equals(op21_05tmp))){
+						if(orderCost.equals("Y")){
+							//20230221新增收率 跟效率計算
+							if(operation.compareTo(endDate.substring(0,6),"202211") >= 0){
+								rec[i][24] = recSA6465CA70[j][3];
+								rec[i][25] = recSA6465CA70[j][4];
+							} else {
+								//放入ca70相關值
+								rec[i][6] = recSA6465CA70[j][3];
+								rec[i][7] = recSA6465CA70[j][4];
+								rec[i][11] = recSA6465CA70[j][5];
+								rec[i][12] = recSA6465CA70[j][6];
+								rec[i][14] = recSA6465CA70[j][7];
+								rec[i][15] = recSA6465CA70[j][8];
+								rec[i][16] = recSA6465CA70[j][9];
+								rec[i][17] = recSA6465CA70[j][10];
+								rec[i][21] = recSA6465CA70[j][11];
+								rec[i][22] = recSA6465CA70[j][12];
+								rec[i][24] = recSA6465CA70[j][13];
+								rec[i][25] = recSA6465CA70[j][14];
+								rec[i][26] = recSA6465CA70[j][15];
+							}
+						}
+					}
+				}
+			}
+		}
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+		for(int i = 0;i<rec.length;i++){
+			//計算運費
+			String sa64_04T = rec[i][0].trim();
+			String sa65_32T = rec[i][1].trim();
+			String sa65_51T = rec[i][3].trim();
+			String sa65_53 = rec[i][8].trim();
+			String sa65_25 = rec[i][10].trim();
+			if(recSA97.length > 0){
+				for(int j = 0;j<recSA97.length;j++){
+					String sa64_04tmp = recSA97[j][0].trim();
+					String sa65_32tmp = recSA97[j][1].trim();
+					String sa65_51tmp = recSA97[j][2].trim();
+					String sa65SUM = rec[i][26].trim();
+					String sa98_12 = recSA97[j][3].trim();
+					if((sa64_04tmp.equals("合計") && sa64_04T.equals("合計")) || (sa64_04tmp.equals(sa64_04T) && sa65_32tmp.equals(sa65_32T) && sa65_51tmp.equals(sa65_51T))){
+						if(operation.compareTo("0",sa65_53) == 0){
+							rec[i][5] = "0.00";
+						} else {
+							rec[i][5] = operation.sub(sa65_25,sa98_12,2);
+							rec[i][5] = operation.sub(rec[i][5],sa65_53,2);
+						}
+						rec[i][6] = operation.sub(sa65SUM,sa98_12,2);
+						rec[i][6] = operation.div(rec[i][6],sa65_53,2);
+
+						rec[i][7] = operation.sub(sa65_53,rec[i][6],2);
+						rec[i][7] = operation.div(sa65_25,rec[i][7],2);
+
+						rec[i][23] = sa98_12;
+					}
+				}
+			}
+
+			//單價kg 元/KG  = (銷售金額 -  運費&保險) / 重量
+			String ca70_06 = rec[i][23].trim();
+			String income = rec[i][21].trim();
+			String sub = operation.sub(sa65_25,ca70_06,2);
+			if(operation.compareTo("0",sa65_53) == 0){
+				rec[i][5] = "0";
+				rec[i][7] = "0";
+			} else {
+				rec[i][5] = operation.div(sub,sa65_53,2);
+				rec[i][7] = operation.div(income,sa65_53,2);
+			}
+		}
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+		//千分位
+		for(int i = 0;i<rec[0].length;i++){
+			if(i > 4){
+				for(int j = 0;j<rec.length;j++){
+					if(rec[j][i] == null){
+						rec[j][i] = "0";
+					}
+
+					if(rec[j][i].trim().length() > 0){
+						if(check.isFloat(rec[j][i],"12,2") == true){
+							if(gl_country.equals("TW")){
+								if(i == 5 || i == 8 || i == 10 || i == 15 || i == 6 || i == 7  || i == 22 || i == 24 || i == 25){
+									rec[j][i] = format.format(rec[j][i],"999,999,999,999.99");
+								} else {
+									rec[j][i] = format.format(operation.add(rec[j][i],"0",0),"999,999,999,999");
+								}
+							} else {
+								rec[j][i] = format.format(rec[j][i],"999,999,999,999.99");
+							}
+						}
+					}
+				}
+			} else {
+				for(int j = 0;j<rec.length;j++){
+					if(rec[j][i] == null){
+						rec[j][i] = "";
+					}
+				}
+			}
+		}
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+		//清除數值
+		for(int i = 0;i<rec.length;i++){
+			rec[i][26] ="";
+		}//*/
+		return rec;
+	}
+	//===============================================================
+	//select Data
+	//===============================================================
+	private String[][] doOutDataB(talk t, Hashtable htParam,String sqlBase,String sqlBase2)throws Exception {
+		String gl_cno = (String)htParam.get("gl_cno");
+		String gl_country = (String)htParam.get("gl_country");
+		String scaleS = "0";
+		if(gl_country.equals("CN")){
+			scaleS = "2";
+		}
+
+		StringBuffer sql = new StringBuffer();
+		Vector vData = new Vector();
+		String[][] rec = null;
+		String sqlSearch = "";
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+		sqlSearch = "";
+		sqlSearch = sqlSearch+",round(sum(sa65_25),"+scaleS+")";
+		sqlSearch = sqlSearch+",round(sum(ca70_22),"+scaleS+"),round(sum(ca70_30),"+scaleS+"),round(sum(sa65_26+sa65_27),"+scaleS+"),round(sum(sa65_25),"+scaleS+")-round(sum(ca70_22),"+scaleS+")-round(sum(ca70_30),"+scaleS+")-round(sum(sa65_26+sa65_27),"+scaleS+")";
+		sqlSearch = sqlSearch+",case when sum(sa65_25) = 0 then 0 else round((sum(sa65_25)-sum(ca70_22)-sum(ca70_30)-sum(sa65_26+sa65_27))/sum(sa65_25)*100,2) end as sa65_25";
+		sqlSearch = sqlSearch+",round(sum(ca70_28),"+scaleS+"),round(sum(ca70_29),"+scaleS+"),round(sum(sa65_58),"+scaleS+"),round(sum(sa65_57),"+scaleS+"),round(sum(sa65_64),"+scaleS+")";
+		sqlSearch = sqlSearch+",round(sum(sa65_25-ca70_22-ca70_28-ca70_29-ca70_30-sa65_57-sa65_58-sa65_64-sa65_26-sa65_27),2)";
+		sqlSearch = sqlSearch+",case when sum(sa65_25) = 0 then 0 else round(sum(sa65_25-ca70_22-ca70_28-ca70_29-ca70_30-sa65_57-sa65_58-sa65_64-sa65_26-sa65_27)/sum(sa65_25)*100,2) end as sa65_25a";
+
+		sql.setLength(0);
+		sql.append(" select sa64_04,sa65_32,sa08_04,round(sum(sa65_53),2),sa07_07,round(sum(sa65_54),2),sa07_06"+sqlSearch+" from (");
+		sql.append(sqlBase2+",sa64_04,sa07_07,sa07_06,sa65_32,sa08_04,sa65_27 from (");
+		sql.append(sqlBase);
+		sql.append("))");
+		sql.append(" group by 1,2,3,5,7");
+		sql.append(" union all ");
+		sql.append(" select '合計','','',round(sum(sa65_53),2),'',round(sum(sa65_54),2),''"+sqlSearch+" from (");
+		sql.append(sqlBase2+",sa64_04,sa07_07,sa07_06,sa65_32,sa08_04,sa65_27 from (");
+		sql.append(sqlBase);
+		sql.append("))");
+		sql.append(" order by sa64_04,sa65_32");
+		rec = t.queryFromPool(sql.toString());
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+		//千分位
+		for(int i = 0;i<rec[0].length;i++){
+			if(i > 2){
+				for(int j = 0;j<rec.length;j++){
+					if(rec[j][i].trim().length() > 0){
+						if(check.isFloat(rec[j][i],"12,2") == true){
+							if(gl_country.equals("TW")){
+								if(i == 3 || i == 5 || i == 12 || i == 19){
+									rec[j][i] = format.format(rec[j][i],"999,999,999,999.99");
+								} else {
+									rec[j][i] = format.format(operation.add(rec[j][i],"0",0),"999,999,999,999");
+								}
+							} else {
+								rec[j][i] = format.format(rec[j][i],"999,999,999,999.99");
+							}
+						}
+					}
+				}
+			} else {
+				for(int j = 0;j<rec.length;j++){
+					if(rec[j][i] == null){
+						rec[j][i] = "";
+					}
+				}
+			}
+		}
+		return rec;//*/
+	}
+	//===============================================================
+	//select Data
+	//===============================================================
+	private String[][] doOutDataC(talk t, Hashtable htParam,String sqlBase,String sqlBase2)throws Exception {
+		String sa65_43 = (String)htParam.get("sa65_43");
+		String gl_cno = (String)htParam.get("gl_cno");
+		String gl_country = (String)htParam.get("gl_country");
+		String scaleS = "0";
+		if(gl_country.equals("CN")){
+			scaleS = "2";
+		}
+
+		StringBuffer sql = new StringBuffer();
+		Vector vData = new Vector();
+		String[][] rec = null;
+		String sqlSearch = "";
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+		sqlSearch = "";
+		sqlSearch = sqlSearch+",round(sum(sa65_53),2),round(sum(sa65_54),2),round(sum(sa65_25),"+scaleS+")";
+		sqlSearch = sqlSearch+",round(sum(ca70_22),"+scaleS+"),round(sum(ca70_30),"+scaleS+"),round(sum(sa65_26+sa65_27),"+scaleS+"),round(sum(sa65_25),"+scaleS+")-round(sum(ca70_22),"+scaleS+")-round(sum(ca70_30),"+scaleS+")-round(sum(sa65_26+sa65_27),"+scaleS+")";
+		sqlSearch = sqlSearch+",round((sum(sa65_25)-sum(ca70_22)-sum(ca70_30)-sum(sa65_26+sa65_27))/sum(sa65_25)*100,2)";
+		sqlSearch = sqlSearch+",round(sum(ca70_28),"+scaleS+"),round(sum(ca70_29),"+scaleS+"),round(sum(sa65_58),"+scaleS+"),round(sum(sa65_57),"+scaleS+"),round(sum(sa65_64),"+scaleS+")";//
+		sqlSearch = sqlSearch+",round(sum(sa65_25-ca70_22-ca70_28-ca70_29-ca70_30-sa65_57-sa65_58-sa65_64-sa65_26-sa65_27),2)";
+		sqlSearch = sqlSearch+",round(sum(sa65_25-ca70_22-ca70_28-ca70_29-ca70_30-sa65_57-sa65_58-sa65_64-sa65_26-sa65_27)/sum(sa65_25)*100,2)";
+
+		sql.setLength(0);
+		sql.append(" select sa64_04"+sqlSearch+" from (");
+		sql.append(sqlBase2+",sa64_04,sa65_27 from (");
+		sql.append(sqlBase);
+		sql.append("))");
+		sql.append(" group by 1");
+		sql.append(" union all ");
+		sql.append(" select '合計'"+sqlSearch+" from (");
+		sql.append(sqlBase2+",sa64_04,sa65_27 from (");
+		sql.append(sqlBase);
+		sql.append("))");
+		sql.append(" order by sa64_04");
+		rec = t.queryFromPool(sql.toString());
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+		//千分位
+		for(int i = 0;i<rec[0].length;i++){
+			for(int j = 0;j<rec.length;j++){
+				if(rec[j][i] == null){
+					rec[j][i] = "";
+				}
+
+				if(rec[j][i].trim().length() > 0){
+					if(check.isFloat(rec[j][i],"12,2") == true){
+						if(gl_country.equals("TW")){
+							if(i == 1 || i == 2 || i == 8 || i == 15){
+								rec[j][i] = format.format(rec[j][i],"999,999,999,999.99");
+							} else {
+								rec[j][i] = format.format(operation.add(rec[j][i],"0",0),"999,999,999,999");
+							}
+						} else {
+							rec[j][i] = format.format(rec[j][i],"999,999,999,999.99");
+						}
+					}
+				}
+			}
+		}
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+		//部門名稱
+		sql.setLength(0);
+		sql.append("select distinct em01_01,trim(em01_03)");
+		sql.append(" from emfm001 ");
+		sql.append(" where em01_cno = '"+gl_cno+"'");
+		sql.append(" and em01_20 = '"+sa65_43+"'");
+		String[][] recEM01 = t.queryFromPool(sql.toString());
+		for(int i = 0;i<rec.length;i++){
+			String em01_01 = rec[i][0].trim();
+			for(int j = 0;j<recEM01.length;j++){
+				String em01_01tmp = recEM01[j][0].trim();
+				String em01_03 = recEM01[j][1].trim();
+				if(em01_01.equals(em01_01tmp)){
+					rec[i][0] = em01_03;
+					break;
+				}
+			}
+		}
+		return rec;//*/
+	}
+	//===============================================================
+	//select Data
+	//===============================================================
+	private String[][] doOutDataD(talk t, Hashtable htParam,String sqlBase,String sqlBase2)throws Exception {
+		String gl_cno = (String)htParam.get("gl_cno");
+		String gl_country = (String)htParam.get("gl_country");
+		String scaleS = "0";
+		if(gl_country.equals("CN")){
+			scaleS = "2";
+		}
+
+		StringBuffer sql = new StringBuffer();
+		Vector vData = new Vector();
+		String[][] rec = null;
+		String sqlSearch = "";
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+		sqlSearch = "";
+		sqlSearch = sqlSearch +",round(sum(sa65_54),2),round(sum(sa65_25),"+scaleS+")";
+		sqlSearch = sqlSearch +",round(sum(ca70_22),"+scaleS+"),round(sum(ca70_30),"+scaleS+"),round(sum(sa65_26+sa65_27),"+scaleS+"),round(sum(sa65_25),"+scaleS+")-round(sum(ca70_22),"+scaleS+")-round(sum(ca70_30),"+scaleS+")-round(sum(sa65_26+sa65_27),"+scaleS+")";
+		sqlSearch = sqlSearch +",case when sum(sa65_25) = 0 then 0 else round((sum(sa65_25)-sum(ca70_22)-sum(ca70_30)-sum(sa65_26+sa65_27))/sum(sa65_25)*100,2) end as sa65_25";
+		sqlSearch = sqlSearch +",round(sum(ca70_28),"+scaleS+"),round(sum(ca70_29),"+scaleS+"),round(sum(sa65_58),"+scaleS+"),round(sum(sa65_57),"+scaleS+"),round(sum(sa65_64),"+scaleS+")";//
+		sqlSearch = sqlSearch +",round(sum(sa65_25-ca70_22-ca70_28-ca70_29-ca70_30-sa65_57-sa65_58-sa65_64-sa65_26-sa65_27),2)";
+		sqlSearch = sqlSearch +",case when sum(sa65_25) = 0 then 0 else round(sum(sa65_25-ca70_22-ca70_28-ca70_29-ca70_30-sa65_57-sa65_58-sa65_64-sa65_26-sa65_27)/sum(sa65_25)*100,2) end as sa65_25a";
+
+		sql.setLength(0);
+		sql.append(" select sa65_60,round(sum(sa65_53),2),sa07_07"+sqlSearch+" from (");
+		sql.append(sqlBase2+",sa65_60,sa07_07,sa65_27 from (");
+		sql.append(sqlBase);
+		sql.append("))");
+		sql.append(" group by 1,3");
+		sql.append(" union all ");
+		sql.append(" select '合計',round(sum(sa65_53),2),''"+sqlSearch+" from (");
+		sql.append(sqlBase2+",sa65_60,sa07_07,sa65_27 from (");
+		sql.append(sqlBase);
+		sql.append("))");
+		sql.append(" order by sa65_60");
+		rec = t.queryFromPool(sql.toString());
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+		//千分位
+		for(int i = 0;i<rec[0].length;i++){
+			for(int j = 0;j<rec.length;j++){
+				if(rec[j][i] == null){
+					rec[j][i] = "";
+				}
+				if(rec[j][i].trim().length() > 0){
+					if(check.isFloat(rec[j][i],"12,2") == true){
+						if(gl_country.equals("TW")){
+							if(i == 1 || i == 3 || i == 9 || i == 16){
+								rec[j][i] = format.format(rec[j][i],"999,999,999,999.99");
+							} else {
+								rec[j][i] = format.format(operation.add(rec[j][i],"0",0),"999,999,999,999");
+							}
+						} else {
+							rec[j][i] = format.format(rec[j][i],"999,999,999,999.99");
+						}
+					}
+				}
+			}
+		}
+		return rec;//*/
+	}
+	//===============================================================
+	//select Data
+	//===============================================================
+	private String[][] doOutDataE(talk t, Hashtable htParam,String sqlBase,String sqlBase2)throws Exception {
+		String gl_cno = (String)htParam.get("gl_cno");
+		String gl_country = (String)htParam.get("gl_country");
+		String scaleS = "0";
+		if(gl_country.equals("CN")){
+			scaleS = "2";
+		}
+
+		StringBuffer sql = new StringBuffer();
+		Vector vData = new Vector();
+		String[][] rec = null;
+		String sqlSearch = "";
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+		sqlSearch = "";
+		sqlSearch = sqlSearch+",round(sum(sa65_25),"+scaleS+")";
+		sqlSearch = sqlSearch+",round(sum(ca70_22),"+scaleS+"),round(sum(ca70_30),"+scaleS+"),round(sum(sa65_26+sa65_27),"+scaleS+"),round(sum(sa65_25),"+scaleS+")-round(sum(ca70_22),"+scaleS+")-round(sum(ca70_30),"+scaleS+")-round(sum(sa65_26+sa65_27),"+scaleS+")";
+		sqlSearch = sqlSearch+",case when sum(sa65_25) = 0 then 0 else round((sum(sa65_25)-sum(ca70_22)-sum(ca70_30)-sum(sa65_26+sa65_27))/sum(sa65_25)*100,2) end as sa65_25";
+		sqlSearch = sqlSearch+",round(sum(ca70_28),"+scaleS+"),round(sum(ca70_29),"+scaleS+"),round(sum(sa65_58),"+scaleS+"),round(sum(sa65_57),"+scaleS+"),round(sum(sa65_64),"+scaleS+")";//
+		sqlSearch = sqlSearch+",round(sum(sa65_25-ca70_22-ca70_28-ca70_29-ca70_30-sa65_57-sa65_58-sa65_64-sa65_26-sa65_27),2)";
+		sqlSearch = sqlSearch+",case when sum(sa65_25) = 0 then 0 else round(sum(sa65_25-ca70_22-ca70_28-ca70_29-ca70_30-sa65_57-sa65_58-sa65_64-sa65_26-sa65_27)/sum(sa65_25)*100,2) end as sa65_25a";
+
+		sql.setLength(0);
+		sql.append(" select sa64_11,round(sum(sa65_53),2),sa07_07,round(sum(sa65_54),2)"+sqlSearch+" from (");
+		sql.append(sqlBase2+", sa64_11,sa07_07,sa65_27 from (");
+		sql.append(sqlBase);
+		sql.append("))");
+		sql.append(" group by 1,3");
+		sql.append(" union all ");
+		sql.append(" select '合計',round(sum(sa65_53),2),'',round(sum(sa65_54),2)"+sqlSearch+" from (");
+		sql.append(sqlBase2+", sa64_11,sa07_07,sa65_27 from (");
+		sql.append(sqlBase);
+		sql.append("))");
+		sql.append(" order by sa64_11");
+		rec = t.queryFromPool(sql.toString());
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+		//千分位
+		for(int i = 0;i<rec[0].length;i++){
+			for(int j = 0;j<rec.length;j++){
+				if(rec[j][i] == null){
+					rec[j][i] = "";
+				}
+				if(rec[j][i].trim().length() > 0){
+					if(check.isFloat(rec[j][i],"12,2") == true){
+						if(gl_country.equals("TW")){
+							if(i == 1 || i == 3 || i == 9 || i == 16){
+								rec[j][i] = format.format(rec[j][i],"999,999,999,999.99");
+							} else {
+								rec[j][i] = format.format(operation.add(rec[j][i],"0",0),"999,999,999,999");
+							}
+						} else {
+							rec[j][i] = format.format(rec[j][i],"999,999,999,999.99");
+						}
+					}
+				}
+			}
+		}
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+		//客戶基本資料
+		sql.setLength(0);
+		sql.append(" select distinct sa03_01,sa03_02");
+		sql.append(" from safm003");
+		sql.append(" where sa03_cno = '"+gl_cno+"'");
+		String[][] recSA03 = t.queryFromPool(sql.toString());
+		for(int i = 0;i<rec.length;i++){
+			String sa64_11 = rec[i][0].trim();
+			for(int j = 0;j<recSA03.length;j++){
+				String sa64_11tmp = recSA03[j][0].trim();
+				String sa03_02 = recSA03[j][1].trim();
+				if(sa64_11.equals(sa64_11tmp)){
+					if(sa03_02.length() >= 10){
+						rec[i][0] = sa03_02.substring(0,10);
+					} else {
+						rec[i][0] = sa03_02;
+					}
+					break;
+				}
+			}
+		}
+		return rec;//*/
+	}
+	//===============================================================
+	//select Data
+	//===============================================================
+	private String[][] doOutDataF(talk t, Hashtable htParam,String sqlBase,String sqlBase2)throws Exception {
+		String gl_cno = (String)htParam.get("gl_cno");
+		String gl_country = (String)htParam.get("gl_country");
+		String scaleS = "0";
+		if(gl_country.equals("CN")){
+			scaleS = "2";
+		}
+
+		StringBuffer sql = new StringBuffer();
+		Vector vData = new Vector();
+		String[][] rec = null;
+		String sqlSearch = "";
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+		sqlSearch = "";
+		sqlSearch = sqlSearch+",round(sum(sa65_25),"+scaleS+")";
+		sqlSearch = sqlSearch+",round(sum(ca70_22),"+scaleS+"),round(sum(ca70_30),"+scaleS+"),round(sum(sa65_26+sa65_27),"+scaleS+"),round(sum(sa65_25),"+scaleS+")-round(sum(ca70_22),"+scaleS+")-round(sum(ca70_30),"+scaleS+")-round(sum(sa65_26+sa65_27),"+scaleS+")";
+		sqlSearch = sqlSearch+",case when sum(sa65_25) = 0 then 0 else round((sum(sa65_25)-sum(ca70_22)-sum(ca70_30)-sum(sa65_26+sa65_27))/sum(sa65_25)*100,2) end as sa65_25";
+		sqlSearch = sqlSearch+",round(sum(ca70_28),"+scaleS+"),round(sum(ca70_29),"+scaleS+"),round(sum(sa65_58),"+scaleS+"),round(sum(sa65_57),"+scaleS+"),round(sum(sa65_64),"+scaleS+")";//
+		sqlSearch = sqlSearch+",round(sum(sa65_25-ca70_22-ca70_28-ca70_29-ca70_30-sa65_57-sa65_58-sa65_64-sa65_26-sa65_27),2)";
+		sqlSearch = sqlSearch+",case when sum(sa65_25) = 0 then 0 else round(sum(sa65_25-ca70_22-ca70_28-ca70_29-ca70_30-sa65_57-sa65_58-sa65_64-sa65_26-sa65_27)/sum(sa65_25)*100,2) end sa65_25a";
+
+		sql.setLength(0);
+		sql.append(" select trim(sa65_31)||'-'||sa07_04,round(sum(sa65_53),2),sa07_07,round(sum(sa65_54),2),sa07_06"+sqlSearch+" from (");
+		sql.append(sqlBase2+",sa65_31,sa07_04,sa07_07,sa07_06,sa65_27 from (");
+		sql.append(sqlBase);
+		sql.append("))");
+		sql.append(" group by 1,3,5");
+		sql.append(" union all ");
+		sql.append(" select '合計',round(sum(sa65_53),2),'',round(sum(sa65_54),2),''"+sqlSearch+" from (");
+		sql.append(sqlBase2+",sa65_31,sa07_04,sa07_07,sa07_06,sa65_27 from (");
+		sql.append(sqlBase);
+		sql.append("))");
+		sql.append(" order by trim(sa65_31)||'-'||sa07_04");
+		rec = t.queryFromPool(sql.toString());
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+		//千分位
+		for(int i = 0;i<rec[0].length;i++){
+			for(int j = 0;j<rec.length;j++){
+				if(rec[j][i] == null){
+					rec[j][i] = "";
+				}
+				if(rec[j][i].trim().length() > 0){
+					if(check.isFloat(rec[j][i],"12,2") == true){
+						if(gl_country.equals("TW")){
+							if(i == 1 || i == 3 || i == 10 || i == 17){
+								rec[j][i] = format.format(rec[j][i],"999,999,999,999.99");
+							} else {
+								rec[j][i] = format.format(operation.add(rec[j][i],"0",0),"999,999,999,999");
+							}
+						} else {
+							rec[j][i] = format.format(rec[j][i],"999,999,999,999.99");
+						}
+					}
+				}
+			}
+		}
+		return rec;//*/
+	}
+	//===============================================================
+	//select Data
+	//===============================================================
+	private String[][] doOutDataG(talk t, Hashtable htParam,String sqlBase,String sqlBase2)throws Exception {
+		String gl_cno = (String)htParam.get("gl_cno");
+		String gl_country = (String)htParam.get("gl_country");
+		String scaleS = "0";
+		if(gl_country.equals("CN")){
+			scaleS = "2";
+		}
+
+		StringBuffer sql = new StringBuffer();
+		Vector vData = new Vector();
+		String[][] rec = null;
+		String sqlSearch = "";
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+		sqlSearch = "";
+		sqlSearch = sqlSearch+",round(sum(sa65_25),"+scaleS+")";
+		sqlSearch = sqlSearch+",round(sum(ca70_22),"+scaleS+"),round(sum(ca70_30),"+scaleS+"),round(sum(sa65_26+sa65_27),"+scaleS+")";//
+		sqlSearch = sqlSearch+",round(sum(sa65_25 - ca70_22- ca70_30 - sa65_26-sa65_27),2),case when sum(sa65_25) = 0 then 0 else round((sum(sa65_25 - ca70_22- ca70_30 - sa65_26-sa65_27)/sum(sa65_25)),4)*100 end as sa65_25";
+		sqlSearch = sqlSearch+",round(sum(ca70_28),"+scaleS+"),round(sum(ca70_29),"+scaleS+"),round(sum(sa65_58),"+scaleS+"),round(sum(sa65_57),"+scaleS+"),round(sum(sa65_64),"+scaleS+")";
+		sqlSearch = sqlSearch+",round(sum(sa65_25-ca70_22-ca70_28-ca70_29-ca70_30-sa65_57-sa65_58-sa65_64-sa65_26-sa65_27),2)";
+		sqlSearch = sqlSearch+",case when sum(sa65_25) = 0 then 0 else round(sum(sa65_25-ca70_22-ca70_28-ca70_29-ca70_30-sa65_57-sa65_58-sa65_64-sa65_26-sa65_27)/sum(sa65_25)*100,2) end as sa65_25a";
+
+		//主資料
+		sql.setLength(0);
+		sql.append(" select sa64_11,sa65_05,round(sum(sa65_53),2),sa07_07,round(sum(sa65_54),2),sa07_06");
+		sql.append(sqlSearch+",sa65_44,trim(sa64_04)||'-'||sa65_60 from (");
+		sql.append(sqlBase2+",sa65_52,sa07_07,sa07_06,sa64_11,sa65_05,sa65_03,sa65_04,sa65_44,sa64_04,sa65_60,sa65_12,sa65_03,sa65_56,sa65_15,sa65_27 from (");
+		sql.append(sqlBase);
+		sql.append("))");
+		sql.append(" group by sa64_11,sa65_03,sa65_04,sa65_05,sa07_07,sa07_06,sa65_12,sa65_44,sa64_04,sa65_60");
+		sql.append(" union all ");
+		sql.append(" select '合計','',round(sum(sa65_53),2),'',round(sum(sa65_54),2),''"+sqlSearch+",'','' from (");
+		sql.append(sqlBase2);
+		sql.append(",sa65_52,sa07_07,sa07_06,sa64_11,sa65_05,sa65_03,sa65_04,sa65_44,sa64_04,sa65_60,sa65_12,sa65_03,sa65_56,sa65_15,sa65_27 from (");
+		sql.append(sqlBase);
+		sql.append("))");
+		sql.append(" group by 1");
+		sql.append(" order by sa64_11,sa65_05");
+		rec = t.queryFromPool(sql.toString());
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+		//千分位
+		for(int i = 0;i<rec[0].length;i++){
+			for(int j = 0;j<rec.length;j++){
+				if(rec[j][i] == null ){
+					rec[j][i] = "";
+				}
+			}
+
+			if(i == 0 || i == 1 || i == 3 || i == 5 || i == 19 || i == 20){
+				continue;
+			}
+			for(int j = 0;j<rec.length;j++){
+				if(rec[j][i].trim().length() > 0){
+					if(check.isFloat(rec[j][i],"12,2") == true){
+						if(gl_country.equals("TW")){
+							if(i == 2 || i == 4 || i == 11 || i == 18){
+								rec[j][i] = format.format(rec[j][i],"999,999,999,999.99");
+							} else {
+								rec[j][i] = format.format(operation.add(rec[j][i],"0",0),"999,999,999,999");
+							}
+						} else {
+							rec[j][i] = format.format(rec[j][i],"999,999,999,999.99");
+						}
+					}
+				}
+			}
+		}
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+		//業務員名稱
+		sql.setLength(0);
+		sql.append(" select distinct sa03_01,sa03_02");
+		sql.append(" from safm003");
+		sql.append(" where sa03_cno = '"+gl_cno+"'");
+		String[][] recSA03 = t.queryFromPool(sql.toString());
+		for(int i = 0;i<rec.length;i++){
+			String sa64_11 = rec[i][0].trim();
+			for(int j = 0;j<recSA03.length;j++){
+				String sa64_11tmp = recSA03[j][0].trim();
+				String sa03_02 = recSA03[j][1].trim();
+				if(sa64_11.equals(sa64_11tmp)){
+					if(sa03_02.length() >= 10){
+						rec[i][0] = sa03_02.substring(0,10);
+					} else {
+						rec[i][0] = sa03_02;
+					}
+					break;
+				}
+			}
+		}
+		return rec;//*/
+	}
+	//===============================================================
+	//select Data
+	//===============================================================
+	private String[][] doOutDataH(talk t, Hashtable htParam,String sqlBase,String sqlBase2)throws Exception {
+		String gl_cno = (String)htParam.get("gl_cno");
+		String gl_country = (String)htParam.get("gl_country");
+		String scaleS = "0";
+		if(gl_country.equals("CN")){
+			scaleS = "2";
+		}
+
+		StringBuffer sql = new StringBuffer();
+		Vector vData = new Vector();
+		String[][] rec = null;
+		String sqlSearch = "";
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+		sqlSearch = "";
+		sqlSearch = sqlSearch+",round(sum(sa65_15),"+scaleS+"),round(sum(sa65_25),"+scaleS+")";
+		sqlSearch = sqlSearch+",round(sum(ca70_22),"+scaleS+"),round(sum(ca70_30),"+scaleS+"),round(sum(sa65_26+sa65_27),"+scaleS+")";//
+		sqlSearch = sqlSearch+",round(sum(sa65_25 - ca70_22- ca70_30 - sa65_26-sa65_27),2),case when sum(sa65_25) = 0 then 0 else round((sum(sa65_25 - ca70_22- ca70_30 - sa65_26-sa65_27)/sum(sa65_25)),4)*100 end as sa65_25";
+		sqlSearch = sqlSearch+",round(sum(ca70_28),"+scaleS+"),round(sum(ca70_29),"+scaleS+"),round(sum(sa65_58),"+scaleS+"),round(sum(sa65_57),"+scaleS+"),round(sum(sa65_64),"+scaleS+")";
+		sqlSearch = sqlSearch+",round(sum(sa65_25-ca70_22-ca70_28-ca70_29-ca70_30-sa65_57-sa65_58-sa65_64-sa65_26-sa65_27),2)";
+		sqlSearch = sqlSearch+",case when sum(sa65_25) = 0 then 0 else round(sum(sa65_25-ca70_22-ca70_28-ca70_29-ca70_30-sa65_57-sa65_58-sa65_64-sa65_26-sa65_27)/sum(sa65_25)*100,2) end as sa65_25";
+
+		sql.setLength(0);
+		sql.append(" select sa64_11,sa65_03||'-'||sa65_04,sa65_05,round(sum(sa65_53),2),sa07_07,round(sum(sa65_54),2),sa07_06");
+		sql.append(",round(sum(sa65_56),"+scaleS+")");//
+		sql.append(",case when sum(sa65_54) = 0 then 0 else round(sum(sa65_25)/sum(sa65_54),4) end as sa65_54");
+		sql.append(",sa65_12"+sqlSearch+",sa65_44,trim(sa64_04)||'-'||sa65_60 from (");//
+		sql.append(sqlBase2+",sa65_52,sa07_07,sa07_06,sa64_11,sa65_05,sa65_03,sa65_04,sa65_44,sa64_04,sa65_60,sa65_12,sa65_03,sa65_56,sa65_15,sa65_27 from (");
+		sql.append(sqlBase);
+		sql.append("))");
+		sql.append(" group by sa64_11,sa65_03,sa65_04,sa65_05,sa07_07,sa07_06,sa65_12,sa65_44,sa64_04,sa65_60");
+		sql.append(" union all ");
+		sql.append(" select '合計','','',round(sum(sa65_53),2),'',round(sum(sa65_54),2),''");
+		sql.append(",round(sum(sa65_56),"+scaleS+")");//
+		sql.append(",case when sum(sa65_54) = 0 then 0 else round(sum(sa65_25)/sum(sa65_54),4) end as sa65_54,''");
+		sql.append(sqlSearch+",'','' from (");
+		sql.append(sqlBase2);
+		sql.append(",sa65_52,sa07_07,sa07_06,sa64_11,sa65_05,sa65_03,sa65_04,sa65_44,sa64_04,sa65_60,sa65_12,sa65_03,sa65_56,sa65_15,sa65_27 from (");
+		sql.append(sqlBase);
+		sql.append("))");
+		sql.append(" group by 1");
+		sql.append(" order by sa64_11,sa65_03||'-'||sa65_04,sa65_05");
+		rec = t.queryFromPool(sql.toString());
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+		//增加客戶小計
+		vData = new Vector();
+		String[] forTable = new String[rec[0].length];
+		Arrays.fill(forTable,"0");
+		for(int i = 0;i<rec.length;i++){
+			vData.add(rec[i]);
+			String sa64_11 = rec[i][0].trim();
+			if(i<rec.length-1){
+				//計算客戶小計
+				for(int j = 0;j < 24;j++){
+					if(j == 0 || j == 1 || j == 2 || j == 4 || j == 6 || j == 9 || j == 16){
+						continue;
+					}
+					if(forTable[j] == null){
+						forTable[j] = "0.00";
+					}
+				}
+
+				forTable[3] = operation.add(forTable[3],rec[i][3],2);
+				forTable[5] = operation.add(forTable[5],rec[i][5],2);
+				forTable[7] = operation.add(forTable[7],rec[i][7],0);
+				forTable[8] = operation.add(forTable[8],rec[i][8],4);
+				forTable[10] = operation.add(forTable[10],rec[i][10],0);
+				forTable[11] = operation.add(forTable[11],rec[i][11],0);
+				forTable[12] = operation.add(forTable[12],rec[i][12],0);
+				forTable[13] = operation.add(forTable[13],rec[i][13],0);
+				forTable[14] = operation.add(forTable[14],rec[i][14],0);
+				forTable[15] = operation.add(forTable[15],rec[i][15],0);
+				forTable[17] = operation.add(forTable[17],rec[i][17],0);
+				forTable[18] = operation.add(forTable[18],rec[i][18],0);
+				forTable[19] = operation.add(forTable[19],rec[i][19],0);
+				forTable[20] = operation.add(forTable[20],rec[i][20],0);
+				forTable[21] = operation.add(forTable[21],rec[i][21],0);
+				forTable[22] = operation.add(forTable[22],rec[i][22],2);
+				forTable[23] = operation.mul(operation.div(forTable[22],forTable[11],4),"100",2);
+
+				String sa64_11Next = rec[i+1][0].trim();
+				if(!sa64_11.equals(sa64_11Next)){
+					if(i > 0){
+						String sa64_11UP = rec[i-1][0].trim();
+						if(!sa64_11.equals(sa64_11UP)){
+
+						} else {
+							forTable[0] = "";
+							forTable[1] = "客戶小計";
+							forTable[2] = "";
+							forTable[4] = "";
+							forTable[6] = "";
+							forTable[9] = "";
+							forTable[16] = "";
+							forTable[24] = "";
+							forTable[25] = "";
+							vData.add(forTable);
+						}
+					}
+
+					forTable = new String[rec[0].length];
+				}
+			}
+
+		}
+		rec = (String[][])vData.toArray(new String[0][0]);
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+		//千分位
+		for(int i = 0;i<rec[0].length;i++){
+			for(int j = 0;j<rec.length;j++){
+				if(rec[j][i] == null){
+					rec[j][i] = "";
+				}
+				if(rec[j][i].trim().length() > 0){
+					if(check.isFloat(rec[j][i],"12,2") == true || check.isFloat(rec[j][i],"12,4") == true){
+						if(gl_country.equals("TW")){
+							if(i == 8){
+								rec[j][i] = format.format(rec[j][i],"999,999,999,999.9999");
+							} else if(i == 3 || i == 5 || i == 7 || i == 16 || i == 23){
+								rec[j][i] = format.format(rec[j][i],"999,999,999,999.99");
+							} else {
+								rec[j][i] = format.format(operation.add(rec[j][i],"0",0),"999,999,999,999");
+							}
+						} else {
+							rec[j][i] = format.format(rec[j][i],"999,999,999,999.99");
+						}
+					}
+				}
+			}
+		}
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+		//業務員
+		sql.setLength(0);
+		sql.append(" select distinct sa02_01,em02_03");
+		sql.append(" from emfm002,safm002");
+		sql.append(" where em02_cno = '"+gl_cno+"'");
+		sql.append(" and em02_cno = sa02_cno");
+		sql.append(" and em02_01 = sa02_03");
+		String[][] recEM02 = t.queryFromPool(sql.toString());
+		for(int i = 0;i<rec.length;i++){
+			String sa02_01 = rec[i][19].trim();
+			for(int j = 0;j<recEM02.length;j++){
+				String sa02_01tmp = recEM02[j][0].trim();
+				String em02_03 = recEM02[j][1].trim();
+				if(sa02_01.equals(sa02_01tmp)){
+					rec[i][19] = em02_03;
+					break;
+				}
+			}
+		}
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+		//客戶簡稱
+		sql.setLength(0);
+		sql.append(" select distinct sa03_01,sa03_02");
+		sql.append(" from safm003");
+		sql.append(" where sa03_cno = '"+gl_cno+"'");
+		String[][] recSA03 = t.queryFromPool(sql.toString());
+		for(int i = 0;i<rec.length;i++){
+			String sa64_11 = rec[i][0].trim();
+			for(int j = 0;j<recSA03.length;j++){
+				String sa64_11tmp = recSA03[j][0].trim();
+				String sa03_02 = recSA03[j][1].trim();
+				if(sa64_11.equals(sa64_11tmp)){
+					if(sa03_02.length() >= 10){
+						rec[i][0] = sa03_02.substring(0,10);
+					} else {
+						rec[i][0] = sa03_02;
+					}
+					break;
+				}
+			}
+		}
+		return rec;//*/
+	}
+	//===============================================================
+	//select Data
+	//===============================================================
+	private String[][] doOutDataI(talk t, Hashtable htParam,String sqlBase,String sqlBase2)throws Exception {
+		String gl_cno = (String)htParam.get("gl_cno");
+		String gl_country = (String)htParam.get("gl_country");
+		String scaleS = "0";
+		if(gl_country.equals("CN")){
+			scaleS = "2";
+		}
+		StringBuffer sql = new StringBuffer();
+		Vector vData = new Vector();
+		String[][] rec = null;
+		String sqlSearch = "";
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+		sqlSearch = "";
+		sqlSearch = sqlSearch+",round(sum(sa65_25),"+scaleS+")";
+		sqlSearch = sqlSearch+",round(sum(ca70_22),"+scaleS+"),round(sum(ca70_30),"+scaleS+"),round(sum(sa65_26+sa65_27),"+scaleS+")";//
+		sqlSearch = sqlSearch+",round(sum(sa65_25 - ca70_22- ca70_30 - sa65_26-sa65_27),2),case when sum(sa65_25) = 0 then 0 else round((sum(sa65_25 - ca70_22- ca70_30 - sa65_26-sa65_27)/sum(sa65_25)),4)*100 end sa65_25";
+		sqlSearch = sqlSearch+",round(sum(ca70_28),"+scaleS+"),round(sum(ca70_29),"+scaleS+"),round(sum(sa65_58),"+scaleS+"),round(sum(sa65_57),"+scaleS+"),round(sum(sa65_64),"+scaleS+")";
+		sqlSearch = sqlSearch+",round(sum(sa65_25-ca70_22-ca70_28-ca70_29-ca70_30-sa65_57-sa65_58-sa65_64-sa65_26-sa65_27),2)";
+		sqlSearch = sqlSearch+",case when sum(sa65_25) = 0 then 0 else round(sum(sa65_25-ca70_22-ca70_28-ca70_29-ca70_30-sa65_57-sa65_58-sa65_64-sa65_26-sa65_27)/sum(sa65_25)*100,2) end as sa65_25a";
+
+		//主資料
+		sql.setLength(0);
+		sql.append(" select sa64_11,sa65_03||'-'||sa65_04,sa65_05,round(sum(sa65_53),2),sa07_07,round(sum(sa65_54),2),sa07_06");
+		sql.append(sqlSearch+",sa65_44,trim(sa64_04)||'-'||sa65_60 from (");
+		sql.append(sqlBase2+",sa64_11,sa65_05,sa08_04,sa08_04,sa65_52,sa07_07,sa07_06,sa65_27,sa64_04,sa65_03,sa65_04,sa65_60,sa65_44 from (");
+		sql.append(sqlBase);
+		sql.append("))");
+		sql.append(" group by sa64_11,sa65_03,sa65_04,sa65_05,sa07_07,sa07_06,sa64_04,sa65_44,sa65_60");
+		sql.append(" union all ");
+		sql.append(" select '合計','','',round(sum(sa65_53),2),'',round(sum(sa65_54),2),''");
+		sql.append(sqlSearch+",'','' from (");
+		sql.append(sqlBase2);
+		sql.append(",sa64_11,sa65_05,sa08_04,sa08_04,sa65_52,sa07_07,sa07_06,sa65_27,sa64_04,sa65_03,sa65_04,sa65_60,sa65_44 from (");
+		sql.append(sqlBase);
+		sql.append("))");
+		sql.append(" group by 1");
+		sql.append(" order by sa64_11,sa65_05");
+		rec = t.queryFromPool(sql.toString());
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+		//加入小計列
+		vData = new Vector();
+		String[] forTable = new String[rec[0].length];
+		Arrays.fill(forTable,"0");
+		for(int i = 0;i<rec.length;i++){
+			vData.add(rec[i]);
+			String sa64_11 = rec[i][0].trim();
+
+			if(i<rec.length-1){
+				for(int j = 0;j < 20;j++){
+					if(j == 0 || j == 1 || j == 2 || j == 4 || j == 6){
+						continue;
+					}
+					if(forTable[j] == null){
+						forTable[j] = "0.00";
+					}
+				}
+
+				forTable[3] = operation.add(forTable[3],rec[i][3],2);
+				forTable[5] = operation.add(forTable[5],rec[i][5],2);
+				forTable[7] = operation.add(forTable[7],rec[i][7],0);
+				forTable[8] = operation.add(forTable[8],rec[i][8],0);
+				forTable[9] = operation.add(forTable[9],rec[i][9],0);
+				forTable[10] = operation.add(forTable[10],rec[i][10],0);
+				forTable[11] = operation.add(forTable[11],rec[i][11],0);
+				forTable[12] = operation.mul(operation.div(forTable[11],forTable[7],4),"100",2);
+				forTable[13] = operation.add(forTable[13],rec[i][13],0);
+				forTable[14] = operation.add(forTable[14],rec[i][14],0);
+				forTable[15] = operation.add(forTable[15],rec[i][15],0);
+				forTable[16] = operation.add(forTable[16],rec[i][16],0);
+				forTable[17] = operation.add(forTable[17],rec[i][17],0);
+				forTable[18] = operation.add(forTable[18],rec[i][18],0);
+				forTable[19] = operation.mul(operation.div(forTable[18],forTable[7],4),"100",2);
+
+				String sa64_11Next = rec[i+1][0].trim();
+				if(!sa64_11.equals(sa64_11Next)){
+					if(i > 0){
+						String sa64_11UP = rec[i-1][0].trim();
+						if(sa64_11.equals(sa64_11UP)){
+							forTable[0] = "";
+							forTable[1] = "小計";
+							forTable[2] = "";
+							forTable[4] = "";
+							forTable[6] = "";
+							forTable[20] = "";
+							forTable[21] = "";
+							vData.add(forTable);
+						}
+					}
+					forTable = new String[rec[0].length];
+				}
+			}
+		}
+		rec = (String[][])vData.toArray(new String[0][0]);
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+		//千分位
+		for(int i = 0;i<rec[0].length;i++){
+			for(int j = 0;j<rec.length;j++){
+				if(rec[j][i] == null){
+					rec[j][i] = "";
+				}
+				if(rec[j][i].trim().length() > 0){
+					if(check.isFloat(rec[j][i],"12,2") == true){
+						if(gl_country.equals("TW")){
+							if(i == 3 || i == 5 || i == 12 || i == 19){
+								rec[j][i] = format.format(rec[j][i],"999,999,999,999.99");
+							} else {
+								rec[j][i] = format.format(operation.add(rec[j][i],"0",0),"999,999,999,999");
+							}
+						} else {
+							rec[j][i] = format.format(rec[j][i],"999,999,999,999.99");
+						}
+					}
+				}
+			}
+		}
+
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+		//業務員名稱
+		sql.setLength(0);
+		sql.append(" select distinct sa03_01,sa03_02");
+		sql.append(" from safm003");
+		sql.append(" where sa03_cno = '"+gl_cno+"'");
+		String[][] recSA03 = t.queryFromPool(sql.toString());
+		for(int i = 0;i<rec.length;i++){
+			String sa64_11 = rec[i][0].trim();
+			for(int j = 0;j<recSA03.length;j++){
+				String sa64_11tmp = recSA03[j][0].trim();
+				String sa03_02 = recSA03[j][1].trim();
+				if(sa64_11.equals(sa64_11tmp)){
+					if(sa03_02.length() >= 10){
+						rec[i][0] = sa03_02.substring(0,10);
+					} else {
+						rec[i][0] = sa03_02;
+					}
+					break;
+				}
+			}
+		}
+		//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+		//去除名稱重複
+		for(int i = 0;i<rec.length;i++){
+			String col0 = rec[rec.length-1-i][0].trim();
+
+			if(rec.length-1-i > 0){
+				String col0UP = rec[rec.length-2-i][0].trim();
+
+				if(col0.equals(col0UP)){
+					rec[rec.length-1-i][0] = "";
+				}
+			}
+		}
+		return rec;//*/
+	}
+	//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+	//Header
+	private String[] getHeader1_1()throws Exception {
+		String [] header = new String[26];
+		String [] setheader = {"部門","品名","品名說明","交易條件","售價元/KG","FOB元/KG","成本元/KG"
+								,"單位利益","重量KG","數量YD","銷售金額","原料成本","(變動)製造費用"
+								,"(變動)推銷費用","邊際貢獻","%","直接人工","(固定)製造費用","(固定)推銷費用"
+								,"(固定)管理費用","(固定)研發費用","營業淨利","淨利率%","運費&保險","收率KG/HR","效率"};
+		for(int i = 0;i<setheader.length;i++){
+			header[i] = setheader[i];
+		}
+		return header;
+	}
+	//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+	//Header
+	private String[] getHeader1_2()throws Exception {
+		String []header = new String[20];
+		String [] setheader = {"部門","品名","品名說明","重量","","數量","","銷售金額","原料成本","(變動)製造費用"
+								,"(變動)推銷費用","邊際貢獻","%","直接人工","(固定)製造費用","(固定)推銷費用","(固定)管理費用"
+								,"(固定)研發費用","營業淨利","淨利率%"};
+		for(int i = 0;i<setheader.length;i++){
+			header[i] = setheader[i];
+		}
+		return header;
+	}
+	//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+	//Header
+	private String[] getHeader1_3()throws Exception {
+		String []header = new String[16];
+		String [] setheader = {"部門","重量","數量","銷售金額","原料成本","(變動)製造費用","(變動)推銷費用"
+								,"邊際貢獻","%","直接人工","(固定)製造費用","(固定)推銷費用","(固定)管理費用"
+								,"(固定)研發費用","營業淨利","淨利率%"};
+		for(int i = 0;i<setheader.length;i++){
+			header[i] = setheader[i];
+		}
+		return header;
+	}
+	//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+	//Header
+	private String[] getHeader1_4()throws Exception {
+		String []header = new String[17];
+		String [] setheader = {"部門","重量","","數量","銷售金額","原料成本","(變動)製造費用"
+								,"(變動)推銷費用","邊際貢獻","%","直接人工","(固定)製造費用","(固定)推銷費用"
+								,"(固定)管理費用","(固定)研發費用","營業淨利","淨利率%"};
+		for(int i = 0;i<setheader.length;i++){
+			header[i] = setheader[i];
+		}
+		return header;
+	}
+	//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+	//Header
+	private String[] getHeader1_6()throws Exception {
+		String []header = new String[18];
+		String [] setheader = {"中類名稱","重量","","數量","","銷售金額","原料成本","(變動)製造費用"
+								,"(變動)推銷費用","邊際貢獻","%","直接人工","(固定)製造費用","(固定)推銷費用"
+								,"(固定)管理費用","(固定)研發費用","營業淨利","淨利率%"};
+		for(int i = 0;i<setheader.length;i++){
+			header[i] = setheader[i];
+		}
+		return header;
+	}
+	//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+	//Header
+	private String[] getHeader1_5()throws Exception {
+		String []header = new String[17];
+		String [] setheader = {"客戶名稱","重量","","數量","銷售金額","原料成本","(變動)製造費用"
+								,"(變動)推銷費用","邊際貢獻","%","直接人工","(固定)製造費用","(固定)推銷費用"
+								,"(固定)管理費用","(固定)研發費用","營業淨利","淨利率%"};
+		for(int i = 0;i<setheader.length;i++){
+			header[i] = setheader[i];
+		}
+		return header;
+	}
+	//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+	//Header
+	private String[] getHeader2_1()throws Exception {
+		String []header = new String[21];
+		String [] setheader = {"客戶名稱","成品代號","重量","","數量","","銷售金額","原料成本"
+								,"(變動)製造費用","(變動)推銷費用","邊際貢獻","%","直接人工","(固定)製造費用"
+								,"(固定)推銷費用","(固定)管理費用","(固定)研發費用","營業淨利","淨利率%","業務員","生產部門"};
+		for(int i = 0;i<setheader.length;i++){
+			header[i] = setheader[i];
+		}
+		return header;
+	}
+	//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+	//Header
+	private String[] getHeader2_2()throws Exception {
+		String []header = new String[26];
+		String [] setheader = {"客戶名稱","訂單編號","成品代號","重量","","數量","","折碼數量","單價"
+								,"","加價","銷售金額","原料成本","(變動)製造費用","(變動)推銷費用","邊際貢獻"
+								,"%","直接人工","(固定)製造費用","(固定)推銷費用","(固定)管理費用","(固定)研發費用"
+								,"營業淨利","淨利率%","業務員","生產部門"};
+		for(int i = 0;i<setheader.length;i++){
+			header[i] = setheader[i];
+		}
+		return header;
+	}
+	//-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+	//Header
+	private String[] getHeader3_1()throws Exception {
+		String []header = new String[22];
+		String [] setheader = {"客戶名稱","訂單編號","成品代號","重量","","數量","","銷售金額","原料成本"
+								,"(變動)製造費用","(變動)推銷費用","邊際貢獻","%","直接人工","(固定)製造費用"
+								,"(固定)推銷費用","(固定)管理費用","(固定)研發費用","營業淨利","淨利率%","業務員","生產部門"};
+		for(int i = 0;i<setheader.length;i++){
+			header[i] = setheader[i];
+		}
+		return header;
+	}
+}
